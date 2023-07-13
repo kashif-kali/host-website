@@ -1,6 +1,5 @@
 FROM ubuntu:latest
 RUN apt update -y
-env=kash
 RUN apt install -y apache2
 RUN apt install -y zip
 RUN apt install -y unzip
