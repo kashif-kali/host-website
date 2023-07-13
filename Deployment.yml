@@ -1,0 +1,20 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: mrdevops
+spec:
+  replicas: 2
+  selector:
+  matchLabels:
+    app: mrdevops
+  template:
+    metadata:
+      labels:
+        app: mrdevops
+  specs:
+   containers:
+       -name: mrdevops
+       image: kashifsahmed/first-job
+       imagePullPolicy: Always
+       ports:
+        -containerPort: 80
