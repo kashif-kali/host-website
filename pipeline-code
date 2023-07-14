@@ -1,0 +1,80 @@
+pipeline { 
+   agent any
+      stages {
+        stage ("checkout from git") {
+           steps {
+           checkout scmGit(branches: [[name: '*/main']], extensions: [], userRemoteConfigs: [[url: 'https://github.com/kashif-kali/host-website.git']])
+          }
+        }
+        stage ("ssh ansible server for sending docker file to ansible server") {
+            steps {
+                sshagent(['Ansible_server']) {
+                   sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.53.190.238 pwd && ls '
+                   sh 'scp /var/lib/jenkins/workspace/first-job/*  ubuntu@13.53.190.238:/home/ubuntu/'
+                }
+            }
+        }     
+        stage ("Building the image ") {
+            steps {
+                  sshagent(['Ansible_server']) {
+                   sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.53.190.238 cd /home/ubuntu/ '
+                      sh 'ssh -o StrictHostKeyChecking=no  ubuntu@13.53.190.238 ls'
+                     sh 'ssh -o StrictHostKeyChecking=no  ubuntu@13.53.190.238 docker --version'
+                     sh 'ssh -o StrictHostKeyChecking=no  ubuntu@13.53.190.238   sudo docker ps '
+                      sh 'ssh -o StrictHostKeyChecking=no  ubuntu@13.53.190.238 sudo  docker build -t $JOB_NAME:V1.$BUILD_ID .'
+                }
+             }
+            } 
+         stage ("Tagging the BUIld image") {
+             steps {
+                   sshagent(['Ansible_server']) {
+                   sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.53.190.238 cd /home/ubuntu/ '
+                      sh 'ssh -o StrictHostKeyChecking=no  ubuntu@13.53.190.238 sudo docker image tag $JOB_NAME:V1.$BUILD_ID  kashifsahmed/$JOB_NAME:V1.$JOB_BUILD '
+                   
+                      sh 'ssh -o StrictHostKeyChecking=no  ubuntu@13.53.190.238 sudo docker image tag $JOB_NAME:V1.$BUILD_ID  kashifsahmed/$JOB_NAME:latest' 
+                      
+                   }
+             }
+         }
+             stage ("push docker image to docker hub") {
+              steps{
+                    sshagent(['Ansible_server']) {
+                withCredentials([string(credentialsId: 'docker_password', variable: 'docker_password')]) {
+                 
+                 sh "ssh -o StrictHostKeyChecking=no ubuntu@13.53.190.238 sudo docker login -u kashifsahmed -p ${docker_password}"
+                
+                 sh 'ssh -o StrictHostKeyChecking=no  ubuntu@13.53.190.238 sudo docker image push kashifsahmed/$JOB_NAME:V1.$JOB_BUILD '
+                   
+                      sh 'ssh -o StrictHostKeyChecking=no  ubuntu@13.53.190.238 sudo docker image push kashifsahmed/$JOB_NAME:latest' 
+
+                 }
+             } 
+          }
+              
+         }
+      
+            stage ("copy the file frm ansible server to kubernates server") {
+             steps{
+                 sshagent(['kubernates_ansible']) {
+                   sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.51.237.149 cd /home/ubuntu/'
+                     sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.51.237.149  sudo su && pwd && ls'
+                   sh 'scp /var/lib/jenkins/workspace/first-job/*  ubuntu@13.51.237.149:/home/ubuntu/'
+              }
+                 
+                 
+             }
+          }
+       
+           stage ("Deployment of kubernates using ansible server") {
+             steps {
+                 sshagent(['Ansible_server']) {
+                    sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.53.190.238  cd /home/ubuntu/ && pwd && ls'
+                    
+                    sh 'ssh -o StrictHostKeyChecking=no ubuntu@13.53.190.238  ansible-playbook Ansible.yml'
+                 }
+                 
+             }  
+           } 
+        }
+    }
+      
